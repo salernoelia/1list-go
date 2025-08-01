@@ -23,9 +23,24 @@ Task lists are stored as JSON files with a `.1list` extension.
 
 ## Building
 
+Get all dependencies
+
 ```sh
-go build -o 1list main.go
+go mod tidy
 ```
+
+```sh
+go build -o task .
+```
+
+## Add it to path
+
+#### macOS
+
+```sh
+sudo mv task /usr/local/bin/
+```
+
 
 ## Notes
 
