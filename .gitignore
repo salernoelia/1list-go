@@ -1,0 +1,10 @@
+1list
+*.exe
+*.out
+
+.vscode/
+.idea/
+
+.DS_Store
+
+.task-cli
