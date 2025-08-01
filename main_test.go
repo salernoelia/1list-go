@@ -19,13 +19,13 @@ func TestConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if config.TaskFolder != "" {
-			t.Fatalf("Expected empty task folder, got %s", config.TaskFolder)
+		if config.TaskDir != "" {
+			t.Fatalf("Expected empty task folder, got %s", config.TaskDir)
 		}
 	})
 
 	t.Run("SaveAndLoadConfig", func(t *testing.T) {
-		config := &Config{TaskFolder: "/test/path"}
+		config := &Config{TaskDir: "/test/path"}
 		err := saveConfig(config)
 		if err != nil {
 			t.Fatalf("Expected no error saving config, got %v", err)
@@ -35,8 +35,8 @@ func TestConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error loading config, got %v", err)
 		}
-		if loadedConfig.TaskFolder != "/test/path" {
-			t.Fatalf("Expected '/test/path', got %s", loadedConfig.TaskFolder)
+		if loadedConfig.TaskDir != "/test/path" {
+			t.Fatalf("Expected '/test/path', got %s", loadedConfig.TaskDir)
 		}
 	})
 }
@@ -328,14 +328,14 @@ func TestFindTaskFiles(t *testing.T) {
 		}
 	})
 
-	t.Run("FindTaskFiles_EmptyFolder", func(t *testing.T) {
+	t.Run("FindTaskFiles_EmptyDir", func(t *testing.T) {
 		_, err := findTaskFiles("")
 		if err == nil {
 			t.Fatalf("Expected error for empty folder path")
 		}
 	})
 
-	t.Run("FindTaskFiles_NonexistentFolder", func(t *testing.T) {
+	t.Run("FindTaskFiles_NonexistentDir", func(t *testing.T) {
 		_, err := findTaskFiles("/nonexistent/path")
 		if err == nil {
 			t.Fatalf("Expected error for nonexistent folder")

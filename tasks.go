@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -47,14 +49,89 @@ func selectTaskFile(folder string, taskFiles []string) (string, error) {
 		fmt.Printf("%d. %s\n", i+1, displayName)
 	}
 	
-	fmt.Print("\nSelect a list (1-", len(taskFiles), "): ")
-	var choice int
-	_, err := fmt.Scanf("%d", &choice)
-	if err != nil || choice < 1 || choice > len(taskFiles) {
-		return "", fmt.Errorf("invalid selection")
+	scanner := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Print("\nSelect a list (1-", len(taskFiles), "), create one 'create <name>' or remove 'remove <number>': ")
+		if !scanner.Scan() {
+			return "", fmt.Errorf("input error")
+		}
+		input := strings.TrimSpace(scanner.Text())
+
+		if strings.HasPrefix(input, "create ") {
+			listName := strings.TrimSpace(input[7:])
+			if listName == "" {
+				fmt.Println("❌ Need list name")
+				continue
+			}
+			err := createNewList(folder, listName)
+			if err != nil {
+				fmt.Printf("❌ %v\n", err)
+				continue
+			}
+			fmt.Printf("✅ Created list: %s\n", listName)
+			// Refresh taskFiles after creation
+			taskFiles, err = findTaskFiles(folder)
+			if err != nil {
+				fmt.Printf("❌ %v\n", err)
+				return "", err
+			}
+			// Redisplay lists
+			fmt.Printf("\n📋 Found %d task lists:\n\n", len(taskFiles))
+			for i, file := range taskFiles {
+				displayName := strings.TrimSuffix(file, ".1list")
+				if idx := strings.Index(displayName, "-"); idx != -1 {
+					displayName = strings.TrimSpace(displayName[:idx])
+				}
+				fmt.Printf("%d. %s\n", i+1, displayName)
+			}
+			continue
+		}
+
+		if strings.HasPrefix(input, "remove ") {
+			numStr := strings.TrimSpace(input[7:])
+			choice, err := strconv.Atoi(numStr)
+			if err != nil || choice < 1 || choice > len(taskFiles) {
+				fmt.Println("❌ Invalid selection")
+				continue
+			}
+			selectedFile := taskFiles[choice-1]
+			fmt.Printf("Remove '%s'? (y/N): ", selectedFile)
+			if scanner.Scan() && strings.ToLower(scanner.Text()) == "y" {
+				err := os.Remove(filepath.Join(folder, selectedFile))
+				if err != nil {
+					fmt.Printf("❌ Failed to remove: %v\n", err)
+					continue
+				}
+				fmt.Printf("✅ Removed: %s\n", selectedFile)
+				// Refresh taskFiles after removal
+				taskFiles, err = findTaskFiles(folder)
+				if err != nil {
+					fmt.Printf("❌ %v\n", err)
+					return "", err
+				}
+				if len(taskFiles) == 0 {
+					return "", fmt.Errorf("no .1list files found")
+				}
+				// Redisplay lists
+				fmt.Printf("\n📋 Found %d task lists:\n\n", len(taskFiles))
+				for i, file := range taskFiles {
+					displayName := strings.TrimSuffix(file, ".1list")
+					if idx := strings.Index(displayName, "-"); idx != -1 {
+						displayName = strings.TrimSpace(displayName[:idx])
+					}
+					fmt.Printf("%d. %s\n", i+1, displayName)
+				}
+			}
+			continue
+		}
+
+		choice, err := strconv.Atoi(input)
+		if err != nil || choice < 1 || choice > len(taskFiles) {
+			fmt.Println("❌ Invalid selection")
+			continue
+		}
+		return filepath.Join(folder, taskFiles[choice-1]), nil
 	}
-	
-	return filepath.Join(folder, taskFiles[choice-1]), nil
 }
 
 func loadTasks(filePath string) (*TaskList, error) {

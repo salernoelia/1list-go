@@ -14,5 +14,5 @@ type TaskList struct {
 }
 
 type Config struct {
-	TaskFolder string `json:"task_folder"`
+	TaskDir string `json:"task_folder"`
 }

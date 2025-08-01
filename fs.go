@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func showFolderContents(folder string) {
+func showDirContents(folder string) {
 	entries, err := os.ReadDir(folder)
 	if err != nil {
 		return

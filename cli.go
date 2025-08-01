@@ -28,7 +28,7 @@ Examples:
 `)
 }
 
-func setFolder(config *Config)  {
+func setDir(config *Config)  {
 			if len(os.Args) < 3 {
 			fmt.Println("❌ Need folder path")
 			return
@@ -40,39 +40,39 @@ func setFolder(config *Config)  {
 			folder = filepath.Join(home, folder[2:])
 		}
 		
-		absFolder, err := filepath.Abs(folder)
+		absDir, err := filepath.Abs(folder)
 		if err != nil {
 			fmt.Printf("❌ Invalid path: %v\n", err)
 			return
 		}
 		
-		if _, err := os.Stat(absFolder); os.IsNotExist(err) {
-			fmt.Printf("❌ Folder not found: %s\n", absFolder)
+		if _, err := os.Stat(absDir); os.IsNotExist(err) {
+			fmt.Printf("❌ Dir not found: %s\n", absDir)
 			return
 		}
 		
-		config.TaskFolder = absFolder
+		config.TaskDir = absDir
 		err = saveConfig(config)
 		if err != nil {
 			fmt.Printf("❌ Save error: %v\n", err)
 			return
 		}
 		
-		fmt.Printf("✅ Folder set: %s\n", absFolder)
-		showFolderContents(absFolder)
+		fmt.Printf("✅ Dir set: %s\n", absDir)
+		showDirContents(absDir)
 }
 
 func removeList(config *Config)  {
-	if config.TaskFolder == "" {
+	if config.TaskDir == "" {
 			fmt.Println("❌ No folder configured")
 			fmt.Println("Use: ./1list set-folder <path>")
 			return
 		}
 		
-		taskFiles, err := findTaskFiles(config.TaskFolder)
+		taskFiles, err := findTaskFiles(config.TaskDir)
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
-			showFolderContents(config.TaskFolder)
+			showDirContents(config.TaskDir)
 			return
 		}
 		
@@ -80,7 +80,7 @@ func removeList(config *Config)  {
 			fmt.Printf("Remove '%s'? (y/N): ", taskFiles[0])
 			scanner := bufio.NewScanner(os.Stdin)
 			if scanner.Scan() && strings.ToLower(scanner.Text()) == "y" {
-				err := os.Remove(filepath.Join(config.TaskFolder, taskFiles[0]))
+				err := os.Remove(filepath.Join(config.TaskDir, taskFiles[0]))
 				if err != nil {
 					fmt.Printf("❌ Failed to remove: %v\n", err)
 					return
@@ -111,7 +111,7 @@ func removeList(config *Config)  {
 		fmt.Printf("Remove '%s'? (y/N): ", selectedFile)
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() && strings.ToLower(scanner.Text()) == "y" {
-			err := os.Remove(filepath.Join(config.TaskFolder, selectedFile))
+			err := os.Remove(filepath.Join(config.TaskDir, selectedFile))
 			if err != nil {
 				fmt.Printf("❌ Failed to remove: %v\n", err)
 				return
@@ -121,7 +121,7 @@ func removeList(config *Config)  {
 }
 
 func createList(config *Config)  {
-	if config.TaskFolder == "" {
+	if config.TaskDir == "" {
 			fmt.Println("❌ No folder configured")
 			fmt.Println("Use: ./1list set-folder <path>")
 			return
@@ -142,14 +142,14 @@ func createList(config *Config)  {
 			listName = strings.Join(os.Args[2:], " ")
 		}
 		
-		err := createNewList(config.TaskFolder, listName)
+		err := createNewList(config.TaskDir, listName)
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
 			return
 		}
 		
 		fmt.Printf("✅ Created list: %s\n", listName)
-		showFolderContents(config.TaskFolder)
+		showDirContents(config.TaskDir)
 }
 
 func runCLI()  {
@@ -160,20 +160,20 @@ func runCLI()  {
 	}
 	
 	if len(os.Args) < 2 {
-		if config.TaskFolder == "" {
+		if config.TaskDir == "" {
 			fmt.Println("🔧 No folder configured")
 			fmt.Println("Use: ./1list set-folder <path>")
 			return
 		}
 		
-		taskFiles, err := findTaskFiles(config.TaskFolder)
+		taskFiles, err := findTaskFiles(config.TaskDir)
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
-			showFolderContents(config.TaskFolder)
+			showDirContents(config.TaskDir)
 			return
 		}
 		
-		taskFile, err := selectTaskFile(config.TaskFolder, taskFiles)
+		taskFile, err := selectTaskFile(config.TaskDir, taskFiles)
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
 			return
@@ -188,7 +188,7 @@ func runCLI()  {
 		fmt.Printf("📁 %s\n", filepath.Base(taskFile))
 		listTasks(taskList)
 		
-		fmt.Println("💡 Commands: <number>, 'add <task>', 'create <name>', 'remove <number>', 'q':")
+		fmt.Println("💡 Commands: <number>, 'add <task>', 'remove <number>', return: 'r', quit: 'q':")
 		scanner := bufio.NewScanner(os.Stdin)
 		for {
 			fmt.Print("> ")
@@ -199,6 +199,10 @@ func runCLI()  {
 			
 			if input == "q" || input == "quit" || input == "exit" {
 				break
+			}
+
+			if input == "r" || input == "return"  {
+				runCLI()
 			}
 			
 			if strings.HasPrefix(input, "add ") {
@@ -217,27 +221,11 @@ func runCLI()  {
 				
 				fmt.Println()
 				listTasks(taskList)
-				fmt.Println("💡 Commands: <number>, 'add <task>', 'create <name>', 'remove <number>', 'q':")
+				fmt.Println("💡 Commands: <number>, 'add <task>', return: 'r', 'remove <number>', quit: 'q':")
 				continue
 			}
 			
-			if strings.HasPrefix(input, "create ") {
-				listName := strings.TrimSpace(input[7:])
-				if listName == "" {
-					fmt.Println("❌ Need list name")
-					continue
-				}
-				
-				err := createNewList(config.TaskFolder, listName)
-				if err != nil {
-					fmt.Printf("❌ %v\n", err)
-					continue
-				}
-				
-				fmt.Printf("✅ Created list: %s\n", listName)
-				continue
-			}
-			
+	
 			if strings.HasPrefix(input, "remove ") {
 				taskNumStr := strings.TrimSpace(input[7:])
 				taskNum, err := strconv.Atoi(taskNumStr)
@@ -263,13 +251,13 @@ func runCLI()  {
 				fmt.Printf("🗑️ Removed: %s\n", removedTask.Title)
 				fmt.Println()
 				listTasks(taskList)
-				fmt.Println("💡 Commands: <number>, 'add <task>', 'create <name>', 'remove <number>', 'q':")
+				fmt.Println("💡 Commands: <number>, 'add <task>', 'remove <number>', return: 'r', quit: 'q':")
 				continue
 			}
 			
 			taskNum, err := strconv.Atoi(input)
 			if err != nil {
-				fmt.Println("❌ Enter number, 'add <task>', 'create <name>', 'remove <number>', or 'q'")
+				fmt.Println("❌ Enter number, 'add <task>', 'remove <number>', or 'q'")
 				continue
 			}
 			
@@ -287,7 +275,7 @@ func runCLI()  {
 			
 			fmt.Println()
 			listTasks(taskList)
-			fmt.Println("💡 Commands: <number>, 'add <task>', 'create <name>', 'remove <number>', 'q':")
+			fmt.Println("💡 Commands: <number>, 'add <task>', 'remove <number>', 'q':")
 		}
 		return
 	}
@@ -296,7 +284,7 @@ func runCLI()  {
 	
 	switch command {
 	case "set-folder":
-		setFolder(config)
+		setDir(config)
 		
 	case "create-list":
 		createList(config)
@@ -316,18 +304,18 @@ func runCLI()  {
 			return
 		}
 		
-		if config.TaskFolder == "" {
+		if config.TaskDir == "" {
 			fmt.Println("❌ No folder configured")
 			return
 		}
 		
-		taskFiles, err := findTaskFiles(config.TaskFolder)
+		taskFiles, err := findTaskFiles(config.TaskDir)
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
 			return
 		}
 		
-		taskFile, err := selectTaskFile(config.TaskFolder, taskFiles)
+		taskFile, err := selectTaskFile(config.TaskDir, taskFiles)
 		if err != nil {
 			fmt.Printf("❌ %v\n", err)
 			return
