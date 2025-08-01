@@ -17,10 +17,12 @@ Usage:
   ./1list                     - List tasks
   ./1list done <number>       - Toggle task
   ./1list set-folder <path>   - Set folder
+  ./1list create-list <name>  - Create new list
   ./1list help               - Show help
 
 Examples:
   ./1list set-folder ~/Tasks
+  ./1list create-list "Shopping"
   ./1list
   ./1list done 3
 `)
@@ -155,6 +157,37 @@ func runCLI()  {
 		
 		fmt.Printf("✅ Folder set: %s\n", absFolder)
 		showFolderContents(absFolder)
+		
+	case "create-list":
+		if config.TaskFolder == "" {
+			fmt.Println("❌ No folder configured")
+			fmt.Println("Use: ./1list set-folder <path>")
+			return
+		}
+		
+		var listName string
+		if len(os.Args) < 3 {
+			fmt.Print("Enter list name: ")
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				listName = strings.TrimSpace(scanner.Text())
+			}
+			if listName == "" {
+				fmt.Println("❌ List name cannot be empty")
+				return
+			}
+		} else {
+			listName = strings.Join(os.Args[2:], " ")
+		}
+		
+		err := createNewList(config.TaskFolder, listName)
+		if err != nil {
+			fmt.Printf("❌ %v\n", err)
+			return
+		}
+		
+		fmt.Printf("✅ Created list: %s\n", listName)
+		showFolderContents(config.TaskFolder)
 		
 	case "done":
 		if len(os.Args) < 3 {

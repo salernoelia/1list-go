@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-
 func findTaskFiles(folder string) ([]string, error) {
 	if folder == "" {
 		return nil, fmt.Errorf("no task folder configured")
@@ -77,12 +76,38 @@ func saveTasks(filePath string, taskList *TaskList) error {
 	return os.WriteFile(filePath, data, 0644)
 }
 
+func createNewList(folder string, listName string) error {
+	if strings.TrimSpace(listName) == "" {
+		return fmt.Errorf("list name cannot be empty")
+	}
+	
+	sanitizedName := strings.ReplaceAll(listName, " ", "-")
+	sanitizedName = strings.ReplaceAll(sanitizedName, "/", "-")
+	sanitizedName = strings.ReplaceAll(sanitizedName, "\\", "-")
+	
+	files, _ := os.ReadDir(folder)
+	counter := 1
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), sanitizedName+"-") && strings.HasSuffix(file.Name(), ".1list") {
+			counter++
+		}
+	}
+	
+	fileName := fmt.Sprintf("%s-%d.1list", sanitizedName, counter)
+	filePath := filepath.Join(folder, fileName)
+	
+	newTaskList := &TaskList{
+		Title: listName,
+		Items: []Task{},
+	}
+	
+	return saveTasks(filePath, newTaskList)
+}
 
 func listTasks(taskList *TaskList) {
     fmt.Printf("\n📋 %s\n", taskList.Title)
     fmt.Println(strings.Repeat("=", len(taskList.Title)+4))
 
-    // Not done section
     fmt.Println("Not done:")
     anyNotDone := false
     for i, task := range taskList.Items {
@@ -95,7 +120,6 @@ func listTasks(taskList *TaskList) {
         fmt.Println()
     }
 
-    // Done section
     fmt.Println("Done:")
     anyDone := false
     for i, task := range taskList.Items {
@@ -108,6 +132,7 @@ func listTasks(taskList *TaskList) {
         fmt.Println()
     }
 }
+
 func addTask(taskList *TaskList, title string) {
 	newTask := Task{
 		ID:               time.Now().UnixNano(),
