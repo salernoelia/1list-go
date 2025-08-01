@@ -42,6 +42,9 @@ func selectTaskFile(folder string, taskFiles []string) (string, error) {
 	fmt.Printf("📋 Found %d task lists:\n\n", len(taskFiles))
 	for i, file := range taskFiles {
 		displayName := strings.TrimSuffix(file, ".1list")
+		if idx := strings.Index(displayName, "-"); idx != -1 {
+			displayName = strings.TrimSpace(displayName[:idx])
+		}
 		fmt.Printf("%d. %s\n", i+1, displayName)
 	}
 	
