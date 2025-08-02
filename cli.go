@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func printUsage() {
@@ -79,8 +80,9 @@ func runInteractiveMode(config *Config) {
 
 	taskFiles, err := findTaskFiles(config.TaskDir)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
-		showDirContents(config.TaskDir)
+		fmt.Printf("📋 No task lists found in: %s\n\n", config.TaskDir)
+		fmt.Println("Let's create your first task list!")
+		handleCreateFirstList(config)
 		return
 	}
 
@@ -129,15 +131,21 @@ func handleInteractiveCommand(input string, taskList *TaskList, taskFile string)
 		return true
 	case strings.HasPrefix(input, "add "):
 		handleAddTask(input, taskList, taskFile)
+	case strings.HasPrefix(input, "a "):
+		handleAddTask(input, taskList, taskFile)
 	case strings.HasPrefix(input, "remove "):
 		handleRemoveTask(input, taskList, taskFile)
+	case strings.HasPrefix(input, "r "):
+		handleRemoveTask(input, taskList, taskFile)
 	case strings.HasPrefix(input, "done "):
+		handleDoneTask(input, taskList, taskFile)
+	case strings.HasPrefix(input, "d "):
 		handleDoneTask(input, taskList, taskFile)
 	default:
 		if taskNum, err := strconv.Atoi(input); err == nil {
 			handleToggleTimer(taskNum, taskList, taskFile)
 		} else {
-			fmt.Println("❌ Invalid command. Type a number, 'add <task>', 'remove <number>', 'done <number>', 'r' to return, or 'q' to quit")
+			fmt.Println("❌ Invalid command. Type a number, 'add / a <task>', 'remove / r <number>', 'done / d <number>', 'r' to return, or 'q' to quit")
 		}
 	}
 	return false
@@ -411,4 +419,26 @@ func handleMarkDone(config *Config) {
 
 func clearScreen() {
 	fmt.Print("\033[2J\033[H")
+}
+
+func handleCreateFirstList(config *Config) {
+	fmt.Print("Enter your first list name: ")
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		listName := strings.TrimSpace(scanner.Text())
+		if listName == "" {
+			fmt.Println("❌ List name cannot be empty")
+			return
+		}
+		
+		if err := createNewList(config.TaskDir, listName); err != nil {
+			fmt.Printf("❌ %v\n", err)
+			return
+		}
+		
+		fmt.Printf("✅ Created your first list: %s\n", listName)
+		fmt.Println("🚀 Starting interactive mode...")
+		time.Sleep(time.Second)
+		runInteractiveMode(config)
+	}
 }

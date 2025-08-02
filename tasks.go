@@ -29,6 +29,7 @@ func findTaskFiles(folder string) ([]string, error) {
 	}
 
 	if len(taskFiles) == 0 {
+		
 		return nil, fmt.Errorf("no task lists found")
 	}
 
@@ -36,10 +37,6 @@ func findTaskFiles(folder string) ([]string, error) {
 }
 
 func selectTaskFile(folder string, taskFiles []string) (string, error) {
-	if len(taskFiles) == 1 {
-		return filepath.Join(folder, taskFiles[0]), nil
-	}
-
 	fmt.Printf("📋 Available task lists (%d):\n\n", len(taskFiles))
 	for i, file := range taskFiles {
 		displayName := strings.TrimSuffix(file, ".json")
@@ -142,34 +139,25 @@ func createNewList(folder string, listName string) error {
 		return fmt.Errorf("list name cannot be empty")
 	}
 
-	sanitizedName := strings.ReplaceAll(listName, " ", "-")
-	sanitizedName = strings.ReplaceAll(sanitizedName, "/", "-")
-	sanitizedName = strings.ReplaceAll(sanitizedName, "\\", "-")
-
-	files, err := os.ReadDir(folder)
-	if err != nil {
-		return fmt.Errorf("cannot read folder: %v", err)
-	}
-
-	maxNum := 0
-	for _, file := range files {
-		name := file.Name()
-		if strings.HasSuffix(name, ".json") {
-			base := strings.TrimSuffix(name, ".json")
-			lastDash := strings.LastIndex(base, "-")
-			if lastDash != -1 && lastDash < len(base)-1 {
-				numStr := base[lastDash+1:]
-				num, err := strconv.Atoi(numStr)
-				if err == nil && num > maxNum {
-					maxNum = num
-				}
-			}
+	sanitizedName := strings.ToLower(listName)
+	sanitizedName = strings.Map(func(r rune) rune {
+		if r == ' ' {
+			return '-'
 		}
-	}
+		if r == '-' || r == '_' ||
+			(r >= 'a' && r <= 'z') ||
+			(r >= '0' && r <= '9') {
+			return r
+		}
+		return -1
+	}, sanitizedName)
 
-	fileNum := maxNum + 1
-	fileName := fmt.Sprintf("%s-%d.json", sanitizedName, fileNum)
+	fileName := fmt.Sprintf("%s.json", sanitizedName)
 	filePath := filepath.Join(folder, fileName)
+
+	if _, err := os.Stat(filePath); err == nil {
+		return fmt.Errorf("list '%s' already exists", listName)
+	}
 
 	now := time.Now()
 	newTaskList := &TaskList{
