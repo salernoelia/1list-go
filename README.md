@@ -1,48 +1,36 @@
-# 1list-go
+# tgo
 
-A minimal command-line tool for managing task lists stored in `.1list` files.
+A minimal CLI tool for managing task lists in `.json` files.
 
-## Usage
+## Commands
 
-- `./1list set-folder <path>`: Set the folder containing your `.1list` files.
-- `./1list`: List tasks and interactively add or toggle them.
-- `./1list done <number>`: Toggle a task as done/undone.
-- `./1list help`: Show usage info.
+- `tgo set-folder <path>`: Set the directory for your task lists.
+- `tgo`: Open interactive mode to view and manage tasks.
+- `tgo done <number>`: Mark a task as done or undone.
+- `tgo help`: Show help info.
 
-## Example
+## Quick Start
 
 ```sh
-./1list set-folder ~/Tasks
-./1list
-./1list done 2
+./tgo set-folder ~/Tasks
+./tgo
+./tgo done 2
 ```
 
-## Task List Format
-
-Task lists are stored as JSON files with a `.1list` extension.
-
-## Building
-
-Get all dependencies
+## Build
 
 ```sh
 go mod tidy
+go build -o tgo .
 ```
+
+## Install (macOS)
 
 ```sh
-go build -o task .
+sudo mv tgo /usr/local/bin/
 ```
-
-## Add it to path
-
-#### macOS
-
-```sh
-sudo mv task /usr/local/bin/
-```
-
 
 ## Notes
 
-- The config file is saved in your home directory as `.task-cli-config.json`.
-- Only `.1list` files in the configured folder are recognized as task lists.
+- Task lists are stored as `.json` files in your chosen folder.
+- Interactive mode lets you add, remove, and

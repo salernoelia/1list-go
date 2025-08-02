@@ -15,23 +15,23 @@ func findTaskFiles(folder string) ([]string, error) {
 	if folder == "" {
 		return nil, fmt.Errorf("no task folder configured")
 	}
-	
+
 	entries, err := os.ReadDir(folder)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read folder %s: %v", folder, err)
 	}
-	
+
 	var taskFiles []string
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".1list") {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
 			taskFiles = append(taskFiles, entry.Name())
 		}
 	}
-	
+
 	if len(taskFiles) == 0 {
-		return nil, fmt.Errorf("no .1list files found")
+		return nil, fmt.Errorf("no task lists found")
 	}
-	
+
 	return taskFiles, nil
 }
 
@@ -39,56 +39,42 @@ func selectTaskFile(folder string, taskFiles []string) (string, error) {
 	if len(taskFiles) == 1 {
 		return filepath.Join(folder, taskFiles[0]), nil
 	}
-	
-	fmt.Printf("📋 Found %d task lists:\n\n", len(taskFiles))
+
+	fmt.Printf("📋 Available task lists (%d):\n\n", len(taskFiles))
 	for i, file := range taskFiles {
-		displayName := strings.TrimSuffix(file, ".1list")
-		if idx := strings.Index(displayName, "-"); idx != -1 {
-			displayName = strings.TrimSpace(displayName[:idx])
-		}
-		fmt.Printf("%d. %s\n", i+1, displayName)
+		displayName := strings.TrimSuffix(file, ".json")
+		fmt.Printf("  %d. %s\n", i+1, displayName)
 	}
-	
+
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Print("\nSelect a list (1-", len(taskFiles), "), create one 'create <name>' or remove 'remove <number>': ")
+		fmt.Printf("\nSelect list (1-%d), create 'c <name>', or remove 'r <number>': ", len(taskFiles))
 		if !scanner.Scan() {
 			return "", fmt.Errorf("input error")
 		}
 		input := strings.TrimSpace(scanner.Text())
 
-		if strings.HasPrefix(input, "create ") {
-			listName := strings.TrimSpace(input[7:])
+		if strings.HasPrefix(input, "c ") {
+			listName := strings.TrimSpace(input[2:])
 			if listName == "" {
-				fmt.Println("❌ Need list name")
+				fmt.Println("❌ List name required")
 				continue
 			}
-			err := createNewList(folder, listName)
-			if err != nil {
+			if err := createNewList(folder, listName); err != nil {
 				fmt.Printf("❌ %v\n", err)
 				continue
 			}
-			fmt.Printf("✅ Created list: %s\n", listName)
-			// Refresh taskFiles after creation
-			taskFiles, err = findTaskFiles(folder)
+			fmt.Printf("✅ Created: %s\n", listName)
+			taskFiles, err := findTaskFiles(folder)
 			if err != nil {
-				fmt.Printf("❌ %v\n", err)
 				return "", err
 			}
-			// Redisplay lists
-			fmt.Printf("\n📋 Found %d task lists:\n\n", len(taskFiles))
-			for i, file := range taskFiles {
-				displayName := strings.TrimSuffix(file, ".1list")
-				if idx := strings.Index(displayName, "-"); idx != -1 {
-					displayName = strings.TrimSpace(displayName[:idx])
-				}
-				fmt.Printf("%d. %s\n", i+1, displayName)
-			}
+			displayTaskFiles(taskFiles)
 			continue
 		}
 
-		if strings.HasPrefix(input, "remove ") {
-			numStr := strings.TrimSpace(input[7:])
+		if strings.HasPrefix(input, "r ") {
+			numStr := strings.TrimSpace(input[2:])
 			choice, err := strconv.Atoi(numStr)
 			if err != nil || choice < 1 || choice > len(taskFiles) {
 				fmt.Println("❌ Invalid selection")
@@ -97,30 +83,19 @@ func selectTaskFile(folder string, taskFiles []string) (string, error) {
 			selectedFile := taskFiles[choice-1]
 			fmt.Printf("Remove '%s'? (y/N): ", selectedFile)
 			if scanner.Scan() && strings.ToLower(scanner.Text()) == "y" {
-				err := os.Remove(filepath.Join(folder, selectedFile))
-				if err != nil {
+				if err := os.Remove(filepath.Join(folder, selectedFile)); err != nil {
 					fmt.Printf("❌ Failed to remove: %v\n", err)
 					continue
 				}
 				fmt.Printf("✅ Removed: %s\n", selectedFile)
-				// Refresh taskFiles after removal
 				taskFiles, err = findTaskFiles(folder)
 				if err != nil {
-					fmt.Printf("❌ %v\n", err)
 					return "", err
 				}
 				if len(taskFiles) == 0 {
-					return "", fmt.Errorf("no .1list files found")
+					return "", fmt.Errorf("no task lists found")
 				}
-				// Redisplay lists
-				fmt.Printf("\n📋 Found %d task lists:\n\n", len(taskFiles))
-				for i, file := range taskFiles {
-					displayName := strings.TrimSuffix(file, ".1list")
-					if idx := strings.Index(displayName, "-"); idx != -1 {
-						displayName = strings.TrimSpace(displayName[:idx])
-					}
-					fmt.Printf("%d. %s\n", i+1, displayName)
-				}
+				displayTaskFiles(taskFiles)
 			}
 			continue
 		}
@@ -134,18 +109,27 @@ func selectTaskFile(folder string, taskFiles []string) (string, error) {
 	}
 }
 
+func displayTaskFiles(taskFiles []string) {
+	fmt.Printf("\n📋 Available task lists (%d):\n\n", len(taskFiles))
+	for i, file := range taskFiles {
+		displayName := strings.TrimSuffix(file, ".json")
+		fmt.Printf("  %d. %s\n", i+1, displayName)
+	}
+}
+
 func loadTasks(filePath string) (*TaskList, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var taskList TaskList
 	err = json.Unmarshal(data, &taskList)
 	return &taskList, err
 }
 
 func saveTasks(filePath string, taskList *TaskList) error {
+	taskList.UpdatedAt = time.Now()
 	data, err := json.MarshalIndent(taskList, "", "  ")
 	if err != nil {
 		return err
@@ -157,85 +141,252 @@ func createNewList(folder string, listName string) error {
 	if strings.TrimSpace(listName) == "" {
 		return fmt.Errorf("list name cannot be empty")
 	}
-	
+
 	sanitizedName := strings.ReplaceAll(listName, " ", "-")
 	sanitizedName = strings.ReplaceAll(sanitizedName, "/", "-")
 	sanitizedName = strings.ReplaceAll(sanitizedName, "\\", "-")
-	
-	files, _ := os.ReadDir(folder)
-	counter := 1
+
+	files, err := os.ReadDir(folder)
+	if err != nil {
+		return fmt.Errorf("cannot read folder: %v", err)
+	}
+
+	maxNum := 0
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), sanitizedName+"-") && strings.HasSuffix(file.Name(), ".1list") {
-			counter++
+		name := file.Name()
+		if strings.HasSuffix(name, ".json") {
+			base := strings.TrimSuffix(name, ".json")
+			lastDash := strings.LastIndex(base, "-")
+			if lastDash != -1 && lastDash < len(base)-1 {
+				numStr := base[lastDash+1:]
+				num, err := strconv.Atoi(numStr)
+				if err == nil && num > maxNum {
+					maxNum = num
+				}
+			}
 		}
 	}
-	
-	fileName := fmt.Sprintf("%s-%d.1list", sanitizedName, counter)
+
+	fileNum := maxNum + 1
+	fileName := fmt.Sprintf("%s-%d.json", sanitizedName, fileNum)
 	filePath := filepath.Join(folder, fileName)
-	
+
+	now := time.Now()
 	newTaskList := &TaskList{
-		Title: listName,
-		Items: []Task{},
+		Title:     listName,
+		Items:     []Task{},
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
-	
+
 	return saveTasks(filePath, newTaskList)
 }
 
-func listTasks(taskList *TaskList) {
-    fmt.Printf("\n📋 %s\n", taskList.Title)
-    fmt.Println(strings.Repeat("=", len(taskList.Title)+4))
+func displayTaskList(taskList *TaskList, fileName string) {
+	listName := strings.TrimSuffix(fileName, ".json")
+	fmt.Printf("┌─ 📋 %s\n", listName)
+	fmt.Printf("├─ %s\n", strings.Repeat("─", len(listName)+4))
 
-    fmt.Println("Not done:")
-    anyNotDone := false
-    for i, task := range taskList.Items {
-        if !task.Done {
-            fmt.Printf("%d. ❌ %s\n", i+1, task.Title)
-            anyNotDone = true
-        }
-    }
-    if anyNotDone {
-        fmt.Println()
-    }
+	activeCount := 0
+	pendingCount := 0
+	doneCount := 0
 
-    fmt.Println("Done:")
-    anyDone := false
-    for i, task := range taskList.Items {
-        if task.Done {
-            fmt.Printf("%d. ✅ %s\n", i+1, task.Title)
-            anyDone = true
-        }
-    }
-    if anyDone {
-        fmt.Println()
-    }
+	for _, task := range taskList.Items {
+		switch task.Status {
+		case StatusActive:
+			activeCount++
+		case StatusPending, StatusPaused:
+			pendingCount++
+		case StatusDone:
+			doneCount++
+		}
+	}
+
+	fmt.Printf("├─ Active: %d │ Pending: %d │ Done: %d\n", activeCount, pendingCount, doneCount)
+	fmt.Printf("└─ %s\n\n", strings.Repeat("─", 40))
+
+	if activeCount > 0 {
+		fmt.Println("🔴 ACTIVE TASKS:")
+		displayTasksByStatus(taskList, StatusActive)
+		fmt.Println()
+	}
+
+	if pendingCount > 0 {
+		fmt.Println("⏸️ PENDING TASKS:")
+		displayTasksByStatus(taskList, StatusPending, StatusPaused)
+		fmt.Println()
+	}
+
+	if doneCount > 0 {
+		fmt.Println("✅ COMPLETED TASKS:")
+		displayTasksByStatus(taskList, StatusDone)
+		fmt.Println()
+	}
+
+	fmt.Println("💡 Commands: <number> (start/stop), add <task>, remove <number>, done <number>, r (return), q (quit)")
+}
+
+func displayTasksByStatus(taskList *TaskList, statuses ...TaskStatus) {
+	statusMap := make(map[TaskStatus]bool)
+	for _, status := range statuses {
+		statusMap[status] = true
+	}
+
+	for i, task := range taskList.Items {
+		if !statusMap[task.Status] {
+			continue
+		}
+
+		var statusIcon string
+		var timeInfo string
+
+		switch task.Status {
+		case StatusActive:
+			statusIcon = "🟢"
+			if task.ActiveStartTime != nil {
+				elapsed := time.Since(*task.ActiveStartTime)
+				timeInfo = fmt.Sprintf(" [Running: %s]", formatDuration(elapsed.Nanoseconds()))
+			}
+		case StatusPending:
+			statusIcon = "⚪"
+			if task.TotalDuration > 0 {
+				timeInfo = fmt.Sprintf(" [Total: %s]", task.GetFormattedDuration())
+			}
+		case StatusPaused:
+			statusIcon = "🟡"
+			timeInfo = fmt.Sprintf(" [Paused: %s]", task.GetFormattedDuration())
+		case StatusDone:
+			statusIcon = "✅"
+			if task.TotalDuration > 0 {
+				timeInfo = fmt.Sprintf(" [Total: %s]", task.GetFormattedDuration())
+			}
+			if task.CompletedAt != nil {
+				timeInfo += fmt.Sprintf(" [Completed: %s]", task.CompletedAt.Format("15:04"))
+			}
+		}
+
+		fmt.Printf("  %d. %s %s%s\n", i+1, statusIcon, task.Title, timeInfo)
+
+		if len(task.Sessions) > 0 && (task.Status == StatusDone || task.Status == StatusPaused) {
+			fmt.Printf("     Sessions: %d │ ", len(task.Sessions))
+			if len(task.Sessions) <= 3 {
+				for j, session := range task.Sessions {
+					fmt.Printf("%s", formatDuration(session.Duration))
+					if j < len(task.Sessions)-1 {
+						fmt.Print(", ")
+					}
+				}
+			} else {
+				for j := 0; j < 2; j++ {
+					fmt.Printf("%s, ", formatDuration(task.Sessions[j].Duration))
+				}
+				fmt.Printf("... +%d more", len(task.Sessions)-2)
+			}
+			fmt.Println()
+		}
+	}
 }
 
 func addTask(taskList *TaskList, title string) {
 	newTask := Task{
-		ID:               time.Now().UnixNano(),
-		Title:            title,
-		Done:             false,
-		Comment:          "",
-		CommentDisplayed: false,
+		ID:            time.Now().UnixNano(),
+		Title:         title,
+		Status:        StatusPending,
+		Comment:       "",
+		Sessions:      []Session{},
+		TotalDuration: 0,
+		CreatedAt:     time.Now(),
 	}
-	
+
 	taskList.Items = append(taskList.Items, newTask)
 	fmt.Printf("✨ Added: %s\n", title)
 }
 
-func markTaskDone(taskList *TaskList, index int) error {
+func removeTask(taskList *TaskList, index int) error {
 	if index < 1 || index > len(taskList.Items) {
 		return fmt.Errorf("invalid task number. Use 1-%d", len(taskList.Items))
 	}
-	
-	task := &taskList.Items[index-1]
-	task.Done = !task.Done
-	
-	action := "completed"
-	if !task.Done {
-		action = "incomplete"
+
+	removedTask := taskList.Items[index-1]
+	taskList.Items = append(taskList.Items[:index-1], taskList.Items[index:]...)
+
+	fmt.Printf("🗑️ Removed: %s\n", removedTask.Title)
+	return nil
+}
+
+func toggleTaskTimer(taskList *TaskList, index int) error {
+	if index < 1 || index > len(taskList.Items) {
+		return fmt.Errorf("invalid task number. Use 1-%d", len(taskList.Items))
 	}
-	
-	fmt.Printf("✨ %s: %s\n", action, task.Title)
+
+	task := &taskList.Items[index-1]
+
+	if task.Status == StatusDone {
+		return fmt.Errorf("cannot start timer for completed task")
+	}
+
+	now := time.Now()
+
+	switch task.Status {
+	case StatusPending, StatusPaused:
+		for i := range taskList.Items {
+			if taskList.Items[i].Status == StatusActive {
+				stopTaskTimer(&taskList.Items[i], now)
+			}
+		}
+		task.Status = StatusActive
+		task.ActiveStartTime = &now
+		fmt.Printf("▶️ Started: %s\n", task.Title)
+
+	case StatusActive:
+		stopTaskTimer(task, now)
+		fmt.Printf("⏸️ Paused: %s [Session: %s] [Total: %s]\n", 
+			task.Title, 
+			formatDuration(task.Sessions[len(task.Sessions)-1].Duration),
+			task.GetFormattedDuration())
+	}
+
+	return nil
+}
+
+func stopTaskTimer(task *Task, endTime time.Time) {
+	if task.ActiveStartTime == nil {
+		return
+	}
+
+	duration := endTime.Sub(*task.ActiveStartTime)
+	session := Session{
+		StartTime: *task.ActiveStartTime,
+		EndTime:   endTime,
+		Duration:  duration.Nanoseconds(),
+	}
+
+	task.Sessions = append(task.Sessions, session)
+	task.TotalDuration += duration.Nanoseconds()
+	task.Status = StatusPaused
+	task.ActiveStartTime = nil
+}
+
+func markTaskComplete(taskList *TaskList, index int) error {
+	if index < 1 || index > len(taskList.Items) {
+		return fmt.Errorf("invalid task number. Use 1-%d", len(taskList.Items))
+	}
+
+	task := &taskList.Items[index-1]
+	now := time.Now()
+
+	if task.Status == StatusActive {
+		stopTaskTimer(task, now)
+	}
+
+	task.Status = StatusDone
+	task.CompletedAt = &now
+
+	totalTime := ""
+	if task.TotalDuration > 0 {
+		totalTime = fmt.Sprintf(" [Total time: %s]", task.GetFormattedDuration())
+	}
+
+	fmt.Printf("✅ Completed: %s%s\n", task.Title, totalTime)
 	return nil
 }

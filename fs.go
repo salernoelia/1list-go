@@ -18,7 +18,7 @@ func showDirContents(folder string) {
 	
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			if strings.HasSuffix(entry.Name(), ".1list") {
+			if strings.HasSuffix(entry.Name(), ".json") {
 				taskFiles = append(taskFiles, entry.Name())
 			} else {
 				otherFiles = append(otherFiles, entry.Name())
